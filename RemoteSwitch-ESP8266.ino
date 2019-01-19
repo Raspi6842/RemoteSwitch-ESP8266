@@ -9,11 +9,17 @@
 
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
+#include <ESP8266HTTPClient.h>
 #include <ESP8266WebServer.h>
 #include <EEPROM.h>
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 
 #define AP_SSID "RemoteSwitch_1_0"
 #define AP_PSK  "switch config"
+
+#define HTTP_ATTEMPTS 3
 
 #define RELAY 12
 #define LED   13
@@ -71,6 +77,40 @@ void setup() {
   Serial.println( F("\nWiFi connected") );
   Serial.print( F("IP address: ") );
   Serial.println(WiFi.localIP());
+
+  ArduinoOTA.setHostname("RemoteSwitch-ESP8266");
+  ArduinoOTA.setPassword("admin");
+  
+  ArduinoOTA.onStart([]() {
+    String type;
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      type = "sketch";
+    } else { // U_SPIFFS
+      type = "filesystem";
+    }
+    Serial.println("Start updating " + type);
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) {
+      Serial.println("Auth Failed");
+    } else if (error == OTA_BEGIN_ERROR) {
+      Serial.println("Begin Failed");
+    } else if (error == OTA_CONNECT_ERROR) {
+      Serial.println("Connect Failed");
+    } else if (error == OTA_RECEIVE_ERROR) {
+      Serial.println("Receive Failed");
+    } else if (error == OTA_END_ERROR) {
+      Serial.println("End Failed");
+    }
+  });
+  ArduinoOTA.begin();
   
   Serial.println( F("Starting webserver...") );
   server.on("/", handleRoot);
@@ -81,12 +121,15 @@ void setup() {
 
 void loop() {
   if( !digitalRead(BTN) ) {
+    while(!digitalRead(BTN));
     digitalWrite(RELAY, !digitalRead(RELAY));
-    delay(250);
+    reportRelayState();
   }
   if( digitalRead(RELAY) ) digitalWrite(LED, HIGH);
   else digitalWrite(LED, LOW);
   server.handleClient();
+  ESP.wdtFeed();
+  ArduinoOTA.handle();
 }
 
 void enableConfigMode() {
@@ -98,6 +141,7 @@ void enableConfigMode() {
   server.on("/save", handleConfigSave);
   server.begin();
   while(1) {
+    ESP.wdtFeed();
     server.handleClient();
   }
 }
@@ -168,7 +212,7 @@ void handleRoot() {
   server.send(200, "text/plain", F("It's working!") );
 }
 
-void handleCmd() {
+void handleCmd() { 
   if( server.args() > 0 ) {
     if( server.arg("cmd") == "get" ) {
       server.send(200, "application/json", "{\"btn\":\"" + String(digitalRead(BTN)?"Not pressed":"Pressed") + 
@@ -177,6 +221,7 @@ void handleCmd() {
       if( server.arg("relay") != "" ) {
         digitalWrite(RELAY, (server.arg("relay")=="1")?1:0);
         server.send(200, "text/plain", F("OK"));
+        reportRelayState();
       }
       else server.send(200, "text/plain", F("Bad arg."));
     } else {
@@ -185,4 +230,11 @@ void handleCmd() {
   } else {
     server.send(200, "text/plain", F("Command site."));
   }
+}
+
+void reportRelayState() {
+  HTTPClient http;
+  http.begin( String("http://192.168.1.100:8080/json.htm?type=command&param=udevice&idx=1&nvalue=") + String((digitalRead(RELAY))?"1":"0"));
+  http.GET();
+  http.end();
 }
