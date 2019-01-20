@@ -1,0 +1,8 @@
+{
+	"SSID": "",
+	"PSK": "",
+	"OTA_HOSTNAME": "RemoteSwitch-ESP8266",
+	"OTA_PASSWD": "admin",
+	"CONTROLLER": "192.168.1.100:8080",
+	"IDX": 1
+}

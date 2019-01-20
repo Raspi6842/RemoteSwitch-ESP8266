@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Config page</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <form action="/save" method="post" class="container">
+        <p class="text-center" style="margin-bottom: 30px;">Enter SSID and password to your WiFi</p>
+        <label for="ssid_name">WiFi SSID</label>
+        <input type="text" name="ssid" id="ssid_name">
+        <label for="psk">WiFi Password</label>
+        <input type="password" name="psk" id="psk">
+        <input type="submit" value="Save">
+    </form>
+</body>
+</html>
